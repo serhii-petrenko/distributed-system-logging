@@ -1,18 +1,20 @@
 package com.course.bff.books.services;
 
+import com.course.bff.books.controlles.BookController;
 import com.course.bff.books.models.Book;
 import com.course.bff.books.requests.CreateBookCommand;
 import com.course.bff.books.responses.AuthorResponse;
+import com.course.bff.books.responses.BookResponse;
 import com.google.gson.Gson;
-import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.DefaultAsyncHttpClientConfig;
-import org.asynchttpclient.Dsl;
-import org.asynchttpclient.ListenableFuture;
-import org.asynchttpclient.Request;
-import org.asynchttpclient.RequestBuilder;
-import org.asynchttpclient.Response;
+import com.google.gson.GsonBuilder;
+import org.asynchttpclient.*;
 import org.asynchttpclient.util.HttpConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.sleuth.annotation.NewSpan;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -24,21 +26,48 @@ import java.util.concurrent.ExecutionException;
 
 @Component
 public class BookService {
+    private final static Logger logger = LoggerFactory.getLogger(BookService.class);
+
+    private final ArrayList<Book> books;
     @Value("${authorService}")
     private String authorService;
 
-    private final ArrayList<Book> books;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Value("${redis.topic}")
+    private String redisTopic;
 
     public BookService() {
         books = new ArrayList<>();
     }
 
     public Collection<Book> getBooks() {
+//        int i = 0;
+//        while (i < 5) {
+//            try {
+//                Thread.sleep(1_000);
+//                i++;
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        throw new IllegalArgumentException("Request params was missed");
         return this.books;
     }
 
     public Optional<Book> findById(UUID id) {
         return this.books.stream().filter(book -> !book.getId().equals(id)).findFirst();
+    }
+
+    @NewSpan(name = "REDIS")
+    public void sendPushNotification(BookResponse bookResponse) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try {
+            redisTemplate.convertAndSend(redisTopic, gson.toJson(bookResponse));
+        } catch (Exception e) {
+            logger.error("Push Notification Error", e);
+        }
     }
 
     public Book create(CreateBookCommand createBookCommand) {
