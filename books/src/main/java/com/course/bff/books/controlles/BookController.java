@@ -16,7 +16,11 @@ import org.asynchttpclient.Response;
 import org.asynchttpclient.util.HttpConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.sleuth.Span;
+import org.springframework.cloud.sleuth.Tracer;
+import org.springframework.cloud.sleuth.annotation.NewSpan;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -72,23 +76,32 @@ public class BookController {
         return createBookResponse(bookSearch.get());
     }
 
+    @Autowired
+    private Tracer tracer;
+
     @PostMapping()
     public BookResponse createBooks(@RequestBody CreateBookCommand createBookCommand) {
+//        Span span = tracer.currentSpan();
+//        span.start();
         logger.info("Create books");
         Book book = this.bookService.create(createBookCommand);
         BookResponse authorResponse = createBookResponse(book);
-        this.sendPushNotification(authorResponse);
+
+//        Span redis = tracer.spanBuilder().name("REDIS").start();
+//        try {
+//            tracer.withSpan(redis.start());
+//            logger.info("Check (new span)");
+//        } finally {
+//            redis.end();
+//        }
+
+        bookService.sendPushNotification(authorResponse);
+//        logger.info("Finished");
+//        span.end();
         return authorResponse;
     }
 
-    private void sendPushNotification(BookResponse bookResponse) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try {
-            redisTemplate.convertAndSend(redisTopic, gson.toJson(bookResponse));
-        } catch (Exception e) {
-            logger.error("Push Notification Error", e);
-        }
-    }
+
 
     private BookResponse createBookResponse(Book book) {
         BookResponse bookResponse = new BookResponse();
