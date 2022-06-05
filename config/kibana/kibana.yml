@@ -1,0 +1,23 @@
+#server.port: 127.0.0.1:5601
+#elasticsearch.url: "http://elasticsearch:9200"
+
+server.port: 5601
+server.host: "0.0.0.0"
+#elasticsearch.hosts: ["https://elasticsearch:9200"]
+elasticsearch.hosts:
+  - "http://elasticsearch:9200"
+server.name: "kibana"
+elasticsearch.username: kibana
+#elasticsearch.username: kibana_system
+elasticsearch.password: ${ELASTICSEARCH_PASSWORD}
+
+monitoring.ui.container.elasticsearch.enabled: true
+
+## X-Pack security credentials
+
+#xpack.security.enabled: true
+#xpack.encryptedSavedObjects.encryptionKey: "013b61bc373d9fd9e324ae5461e5e77c"
+#xpack.reporting.encryptionKey: "61cb47c77fbf319b391a5fbaba682dcf"
+#xpack.security.encryptionKey: "d8d353548f250a9c8d1f012d04766379"
+
+#xpack.reporting.kibanaServer.hostname: localhost

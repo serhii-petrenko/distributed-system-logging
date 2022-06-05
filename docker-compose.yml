@@ -32,8 +32,6 @@ services:
     container_name: bff-redis
     ports:
       - 16379:6379
-#    networks:
-#      - mynet
   bff-frontend:
     image: frontend
     container_name: bff-frontend-service
@@ -51,8 +49,90 @@ services:
       - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:
       - 9411:9411
-#    networks:
-#      - mynet
 
-#networks:
-#  mynet:
+
+  #Elasticsearch container
+  elasticsearch:
+    container_name: elasticsearch
+    hostname: elasticsearch
+    image: "docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}"
+    environment:
+#      - http.host=127.0.0.1
+#      - http.host=0.0.0.0
+      - transport.host=127.0.0.1
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+#    mem_limit: 512m
+      - ELASTIC_PASSWORD=${ES_PASSWORD}
+      - ELASTIC_USERNAME=elastic
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./config/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/elasticsearch.yml
+      - esdata:/usr/share/elasticsearch/data
+    #Port 9200 is available on the host. Need to for user to access as well as Packetbeat
+    ports: ['9200:9200']
+    #Healthcheck to confirm availability of ES. Other containers wait on this.
+    healthcheck:
+      test: ["CMD", "curl","-s" ,"-f", "-u", "elastic:${ES_PASSWORD}", "http://localhost:9200/_cat/health"]
+
+  #Kibana container
+  kibana:
+    container_name: kibana
+    hostname: kibana
+    image: "docker.elastic.co/kibana/kibana:8.2.2"
+    volumes:
+      - ./config/kibana/kibana.yml:/usr/share/kibana/kibana.yml
+    #Port 5601 accessible on the host
+    ports: ['5601:5601']
+    #We don't start Kibana until the ES instance is ready
+    depends_on: ['elasticsearch']
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${ES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/login"]
+      retries: 6
+
+  #Filebeat container
+  filebeat:
+    container_name: filebeat
+    hostname: filebeat
+    user: root
+    image: "docker.elastic.co/beats/filebeat:${ELASTIC_VERSION}"
+    volumes:
+      #Mount the filebeat configuration so users can make edit
+      - ./config/beats/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      #Mount the prospectors directory. Users can in turn add propspectors to this directory and they will be dynamically loaded
+      - ./config/beats/filebeat/inputs.d/:/usr/share/filebeat/inputs.d/
+      #Mount the hosts system log directory. This represents the logs of the VM hosting docker. Consumed by the filebeat system module.
+      - /var/log/:/var/log/host/:ro
+      #Mount the docker logs for indexing by the custom prospector ./config/filebeat/prospectors.d
+      - /var/lib/docker/containers:/hostfs/var/lib/docker/containers
+      #Named volume fsdata. This is used to persist the registry file between restarts, so to avoid data duplication
+      - fbdata:/usr/share/filebeat/data/
+    command: filebeat -e -E output.elasticsearch.username=elastic -E output.elasticsearch.password=${ES_PASSWORD} -strict.perms=false
+    restart: on-failure
+    depends_on:
+      #wait for the these services to come up. This ensures the logs are available and ES exists for indexing
+      - elasticsearch
+
+  configure_stack:
+    container_name: configure_stack
+    image: docker.elastic.co/beats/metricbeat:${ELASTIC_VERSION}
+    volumes: ['./init/configure-stack.sh:/usr/local/bin/configure-stack.sh:ro','./init/pipelines/:/usr/local/bin/pipelines/','./init/templates/:/usr/local/bin/templates/']
+    command: ['/bin/bash', '-c', 'cat /usr/local/bin/configure-stack.sh | tr -d "\r" | bash']
+    environment: ['ELASTIC_VERSION=${ELASTIC_VERSION}','ES_PASSWORD=${ES_PASSWORD}','DEFAULT_INDEX_PATTERN=${DEFAULT_INDEX_PATTERN}']
+    depends_on: ['elasticsearch','kibana']
+
+volumes:
+  #Es data
+  esdata:
+    driver: local
+  #Filebeat data i.e. registry file
+  fbdata:
+    driver: local

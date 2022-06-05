@@ -1,0 +1,10 @@
+#cluster.name: full-stack-cluster
+#node.name: node-1
+path.data: /usr/share/elasticsearch/data
+http.port: 9200
+xpack.license.self_generated.type: trial
+xpack.security.enabled: true
+#xpack.monitoring.collection.enabled: true
+#xpack.encryptedSavedObjects.encryptionKey: 013b61bc373d9fd9e324ae5461e5e77c
+#xpack.reporting.encryptionKey: 61cb47c77fbf319b391a5fbaba682dcf
+#xpack.security.encryptionKey: d8d353548f250a9c8d1f012d04766379
