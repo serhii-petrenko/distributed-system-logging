@@ -6,6 +6,7 @@ import com.course.bff.authors.responses.AuthorResponse;
 import com.course.bff.authors.services.AuthorService;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.micrometer.core.annotation.Timed;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.Dsl;
@@ -34,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("api/v1/authors")
+@Timed(value = "execution_duration", extraTags = {"AuthorController", "authors-service"})
 public class AuthorController {
 
     @Value("${redis.topic}")
