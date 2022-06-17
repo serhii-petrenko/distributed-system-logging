@@ -1,0 +1,8 @@
+filebeat.inputs:
+  - type: container
+    stream: stdout
+    paths:
+      - '/hostfs/var/lib/docker/containers/*/*.log'
+#All data to indexed to Elasticsearch
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
