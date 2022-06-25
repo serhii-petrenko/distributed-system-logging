@@ -6,6 +6,8 @@ import com.course.bff.books.responses.BookResponse;
 import com.course.bff.books.services.BookService;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClientConfig;
 import org.asynchttpclient.Dsl;
@@ -38,6 +40,7 @@ import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("api/v1/books")
+@Timed(value = "execution_duration", extraTags = {"BookController", "books-service"})
 public class BookController {
 
     private final static Logger logger = LoggerFactory.getLogger(BookController.class);
@@ -47,6 +50,9 @@ public class BookController {
     @Value("${redis.topic}")
     private String redisTopic;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     public BookController(BookService bookService, RedisTemplate<String, Object> redisTemplate) {
         this.bookService = bookService;
         this.redisTemplate = redisTemplate;
@@ -54,6 +60,7 @@ public class BookController {
 
     @GetMapping()
     public Collection<BookResponse> getBooks() {
+        count();
         logger.info("Get book list");
         List<BookResponse> bookResponses = new ArrayList<>();
         this.bookService.getBooks().forEach(book -> {
@@ -64,8 +71,13 @@ public class BookController {
         return bookResponses;
     }
 
+    private void count() {
+        meterRegistry.counter("request_count", "BookController", "books-service").increment();
+    }
+
     @GetMapping("/{id}")
     public BookResponse getById(@PathVariable UUID id) {
+        count();
         logger.info(String.format("Find book by id %s", id));
         Optional<Book> bookSearch = this.bookService.findById(id);
         if (bookSearch.isEmpty()) {
@@ -81,6 +93,7 @@ public class BookController {
 
     @PostMapping()
     public BookResponse createBooks(@RequestBody CreateBookCommand createBookCommand) {
+        count();
 //        Span span = tracer.currentSpan();
 //        span.start();
         logger.info("Create books");
